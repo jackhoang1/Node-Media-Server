@@ -20,19 +20,39 @@ class NodeRelaySession extends EventEmitter {
   }
 
   run() {
-    let vc = this.conf.vc || 'copy';
-    let ac = this.conf.ac || 'copy';
     let format = this.conf.ouPath.startsWith('rtsp://') ? 'rtsp' : 'flv';
-    let argv = ['-i', this.conf.inPath];
-    Array.prototype.push.apply(argv, ['-c:v', vc]);
+
+    let argv = [
+      '-re',
+      '-i',
+      this.conf.inPath,
+      '-loop',
+      '1',
+      '-f',
+      'image2',
+    ];
+
     Array.prototype.push.apply(argv, this.conf.vcParam);
-    Array.prototype.push.apply(argv, ['-c:a', ac]);
-    // Array.prototype.push.apply(argv, this.conf.acParam);
-    Array.prototype.push.apply(argv, ['-f', format, this.conf.ouPath]);
+
+    let option = [
+      '-filter_complex',
+      '[0:v][1:v] overlay=0:0',
+      '-vcodec',
+      'libx264',
+      '-acodec',
+      'aac',
+      '-f',
+      format,
+      this.conf.ouPath
+    ]
+
+    Array.prototype.push.apply(argv, option);
+
+    console.log("argv:::::>>>>>", argv)
+
     if (this.conf.inPath[0] === '/' || this.conf.inPath[1] === ':') {
       argv.unshift('-1');
       argv.unshift('-stream_loop');
-      argv.unshift('-re');
     }
 
     if (this.conf.inPath.startsWith('rtsp://') && this.conf.rtsp_transport) {
@@ -42,7 +62,8 @@ class NodeRelaySession extends EventEmitter {
       }
     }
 
-    Logger.ffdebug(argv.toString());
+    Logger.log('[relay task] id=' + this.id, 'cmd=ffmpeg', argv.join(' '));
+
     this.ffmpeg_exec = spawn(this.conf.ffmpeg, argv);
     this.ffmpeg_exec.on('error', (e) => {
       Logger.ffdebug(e);
@@ -57,7 +78,7 @@ class NodeRelaySession extends EventEmitter {
     });
 
     this.ffmpeg_exec.on('close', (code) => {
-      Logger.log('[Relay end] id=', this.id);
+      Logger.log('[relay end] id=' + this.id, 'code=' + code);
       this.emit('end', this.id);
     });
   }
